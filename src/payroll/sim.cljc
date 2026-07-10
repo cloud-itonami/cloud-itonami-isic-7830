@@ -1,0 +1,111 @@
+(ns payroll.sim
+  "Demo runner: push seven representative operations through one
+  OperationActor and watch the PayrollGovernor + approval workflow earn
+  the PayrollProcessor-LLM the right to commit a payroll run, submit a
+  filing, or resolve a dispute.
+
+    op1  クリーンな給与計算(出典あり・許容範囲内)          → commit
+    op2  給与計算が出典なし                                → source-provenance REJECT → hold
+    op3  開示クエリが tier/basic 契約なのに source/filing-status を要求 → licensed-disclosure REJECT → hold
+    op3a 開示クエリが未契約 tenant から                    → licensed-disclosure REJECT → hold
+    op4  紛争中(disputed)従業員への給与計算               → 人間承認へ escalate → approve → commit
+    op5  給与紛争申立て(どの phase でも常に人間レビュー)  → escalate → approve → commit
+    op6  源泉徴収額が許容乖離(20%)を大幅超過              → tax-withholding-calculation-gate REJECT → hold
+    op7  申告期限超過後の提出                              → filing-deadline-gate REJECT → hold
+
+  Run: clojure -M:dev:run"
+  (:require [langgraph.graph :as g]
+            [payroll.store :as store]
+            [payroll.operation :as op]
+            [payroll.facts :as facts]
+            [payroll.report :as report]))
+
+(defn- line [& xs] (println (apply str xs)))
+
+(defn- run-op!
+  [actor thread-id request context approve?]
+  (let [res (g/run* actor {:request request :context context} {:thread-id thread-id})]
+    (if (= :interrupted (:status res))
+      (do (line "   ⏸  人間レビュー待ち (reason: "
+                (-> res :state :audit last :reason) ")")
+          (let [res2 (g/run* actor
+                             {:approval {:status (if approve? :approved :rejected)
+                                         :by "compliance-1"}}
+                             {:thread-id thread-id :resume? true})]
+            (line "   ▶  " (if approve? "承認 → " "却下 → ") "disposition = "
+                  (get-in res2 [:state :disposition]))
+            res2))
+      (do (line "   → disposition = " (get-in res [:state :disposition])
+                "  (confidence " (get-in res [:state :verdict :confidence]) ")")
+          res))))
+
+(defn -main [& _]
+  (let [db    (store/seed-db)
+        actor (op/build db)
+        operator {:actor-id "po-1" :actor-role :payroll-operator :phase 3}
+        officer  {:actor-id "co-1" :actor-role :compliance-officer :phase 3}]
+
+    (line "── R0 出典カバレッジ(正直な現状) ──")
+    (line (pr-str (facts/coverage)))
+
+    (line "\n── OperationActor (PayrollProcessor-LLM sealed; PayrollGovernor active) ──")
+
+    (line "\nop1  クリーンな給与計算(出典あり・許容範囲内)")
+    (run-op! actor "op1"
+             {:op :payroll/process :subject "emp-1" :employee-id "emp-1" :period "2026-P01"
+              :gross 3692.31M :withholding 812.31M
+              :source {:class :irs-federal-withholding-table :ref "irs-pub-15-t:2026"}}
+             operator true)
+
+    (line "\nop2  給与計算 — PayrollProcessor-LLM が出典なしで提案")
+    (run-op! actor "op2"
+             {:op :payroll/process :subject "emp-1" :employee-id "emp-1" :period "2026-P02"
+              :gross 3692.31M :withholding 812.31M
+              :source {:class :irs-federal-withholding-table :ref "irs-pub-15-t:2026"}
+              :unsourced? true}
+             operator true)
+
+    (line "\nop3  開示クエリ(tier/basic 契約なのに source/filing-status まで要求)")
+    (run-op! actor "op3"
+             {:op :disclosure/query :subject "emp-1" :employee-id "emp-1" :greedy? true}
+             {:actor-id "sub-1" :actor-role :employer-subscriber :tenant "tenant-basic"} true)
+
+    (line "\nop3a 開示クエリ(登録されていない tenant から)")
+    (run-op! actor "op3a"
+             {:op :disclosure/query :subject "emp-1" :employee-id "emp-1"}
+             {:actor-id "sub-2" :actor-role :employer-subscriber :tenant "tenant-ghost"} true)
+
+    (line "\nop4  紛争中(disputed)従業員への給与計算(出典・許容範囲は正常でも人間承認)")
+    (run-op! actor "op4"
+             {:op :payroll/process :subject "emp-2" :employee-id "emp-2" :period "2026-P01"
+              :gross 3230.77M :withholding 193.85M
+              :source {:class :state-withholding-table :ref "ca-de-44:2026"}}
+             operator true)
+
+    (line "\nop5  給与紛争申立て — 従業員による源泉徴収額への異議(どの phase でも常に人間レビュー)")
+    (run-op! actor "op5"
+             {:op :dispute/request :subject "emp-1" :disputed-field :withholding :claim 800.00M}
+             officer true)
+
+    (line "\nop6  源泉徴収額が許容乖離(20%)を大幅超過(計算ミス疑い)")
+    (run-op! actor "op6"
+             {:op :payroll/process :subject "emp-3" :employee-id "emp-3" :period "2026-P01"
+              :gross 4230.77M :withholding 1200.00M
+              :source {:class :state-withholding-table :ref "ny-it-2104:2026"}}
+             operator true)
+
+    (line "\nop7  申告期限(2026-04-30)超過後の Form 941 提出")
+    (run-op! actor "op7"
+             {:op :filing/submit :subject "fil-2026-q1-941" :filing-id "fil-2026-q1-941"
+              :form "941" :period "2026-Q1" :employer-id "er-100"
+              :as-of "2026-05-15" :due-date "2026-04-30"}
+             operator true)
+
+    (line "\n── 開示(governor が承認した tier/basic 列のみ) ──")
+    (line (pr-str (report/render-payroll db "emp-1" "2026-P01" [:employee-id :period :gross :withholding :net])))
+
+    (line "\n── 監査台帳 (append-only) ──")
+    (doseq [f (store/ledger db)]
+      (line "  " (store/ledger-line f)))
+
+    (line "\ndone.")))
