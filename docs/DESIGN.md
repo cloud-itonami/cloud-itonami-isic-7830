@@ -56,7 +56,7 @@ governor のトレランスチェック専用の簡易近似であり、本番�
 `default-phase` は実装当初から保守的な `1`(isic-6311 の fail-open 修正
 を最初から適用)。`:dispute/request` はどの phase の `:auto` にも入らない。
 
-## 6. テスト(`clojure -M:dev:test`)
+## 6. テスト(`kbb -M:dev:test`)
 
 `test/payroll/policy_contract_test.cljk` がガバナンス契約を実行可能にする。
 `test/payroll/phase_test.cljk` が段階導入を保証。`test/payroll/facts_test.cljk`
