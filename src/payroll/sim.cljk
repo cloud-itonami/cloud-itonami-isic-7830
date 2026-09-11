@@ -13,7 +13,7 @@
     op6  源泉徴収額が許容乖離(20%)を大幅超過              → tax-withholding-calculation-gate REJECT → hold
     op7  申告期限超過後の提出                              → filing-deadline-gate REJECT → hold
 
-  Run: clojure -M:dev:run"
+  Run: kbb -M:dev:run"
   (:require [langgraph.graph :as g]
             [payroll.store :as store]
             [payroll.operation :as op]
