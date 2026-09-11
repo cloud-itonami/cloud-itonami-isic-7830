@@ -17,13 +17,13 @@ ADP/Gusto/Paychex 級の給与計算・申告処理サービスを、SaaS課金�
 | 申告期限超過を「期限内提出」として記録 | 申告遅延の隠蔽 |
 | 紛争中の従業員への給与計算を高確信のまま自動処理 | 紛争の悪化 |
 
-## 2. OperationActor(`src/payroll/operation.cljc`)
+## 2. OperationActor(`src/payroll/operation.cljk`)
 
 `intake → advise(PayrollProcessor-LLM) → govern(PayrollGovernor) → decide`
 — governor-clean なら `commit`、`escalate` なら `request-approval`
 ([interrupt-before] 経由で人間承認)、hard violation なら `hold`。
 
-## 3. PayrollGovernor(`src/payroll/policy.cljc`)
+## 3. PayrollGovernor(`src/payroll/policy.cljk`)
 
 8チェック(優先順位順、HARDは人間承認でも上書き不可):
 
@@ -45,7 +45,7 @@ ADP/Gusto/Paychex 級の給与計算・申告処理サービスを、SaaS課金�
 
 ## 4. R0 の正直なスコープ
 
-`src/payroll/facts.cljc`: 連邦(IRS Pub 15-T)+ カリフォルニア州(DE 44)
+`src/payroll/facts.cljk`: 連邦(IRS Pub 15-T)+ カリフォルニア州(DE 44)
 + ニューヨーク州(IT-2104)の3法域の源泉徴収表参照、および連邦 Form
 941(四半期)/W-2(年次)の申告期限のみ。`demo-flat-rate-estimate` は
 governor のトレランスチェック専用の簡易近似であり、本番の税額計算基盤
@@ -58,6 +58,6 @@ governor のトレランスチェック専用の簡易近似であり、本番�
 
 ## 6. テスト(`clojure -M:dev:test`)
 
-`test/payroll/policy_contract_test.clj` がガバナンス契約を実行可能にする。
-`test/payroll/phase_test.clj` が段階導入を保証。`test/payroll/facts_test.clj`
+`test/payroll/policy_contract_test.cljk` がガバナンス契約を実行可能にする。
+`test/payroll/phase_test.cljk` が段階導入を保証。`test/payroll/facts_test.cljk`
 が出典カタログの正直さを保証。

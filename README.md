@@ -35,7 +35,7 @@ This actor **computes and submits payroll only**. It never makes an
 employment decision, never determines benefits eligibility, never holds
 custody of funds beyond what a payroll processor legally requires (see
 `docs/adr/0001-architecture.md`). Withholding provenance is limited to
-real, citable authority publications (`src/payroll/facts.cljc`: IRS
+real, citable authority publications (`src/payroll/facts.cljk`: IRS
 Publication 15-T federal + California DE 44 + New York IT-2104, tax year
 2026) — every computed withholding must cite one of these, never a bare
 "the LLM estimated it".
