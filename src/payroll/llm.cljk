@@ -10,7 +10,7 @@
   touches the SSoT or is filed with a tax authority.
 
   Deterministic mock, mirrors `marketdata.llm`'s discipline."
-  (:require #?(:clj  [clojure.edn :as edn]
+  (:require #?(:clj  [kotoba.lang.edn :as edn]
                :cljs [cljs.reader :as edn])
             [kotoba.lang.text :as str]
             [langchain.model :as model]
