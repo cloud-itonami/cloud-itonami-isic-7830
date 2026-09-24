@@ -3,7 +3,7 @@
   test: PayrollProcessor-LLM never commits a payroll run/files a return/
   resolves a dispute the PayrollGovernor would reject, and every decision
   (commit OR hold) leaves exactly one ledger fact."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [langgraph.graph :as g]
             [payroll.store :as store]
             [payroll.operation :as op]))
