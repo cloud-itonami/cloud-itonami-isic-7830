@@ -37,7 +37,7 @@ io.github.kotoba-lang/langgraph
  :aliases
  {:dev {:override-deps
         {io.github.kotoba-lang/langchain
-         {:local/root "../../kotoba-lang/langchain"}}}
+        {:local/root "../../kotoba-lang/kotoba/lib/kotoba.langchain"}}}
   :run {:main-opts ["-m" "payroll.sim"]}
   :render-html {:main-opts ["-m" "payroll.render-html"]}
   :test {:extra-paths ["test"]
